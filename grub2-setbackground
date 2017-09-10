@@ -33,6 +33,13 @@ if [ $# -eq 0 ]
   then
     echo "Please provide argument as an image"
 else
+
+	yum install grub2-starfield-theme -y
+	
+	rm -Rf /boot/grub2/themes/system
+	
+	cp -a /usr/share/grub/themes/starfield /boot/grub2/themes/system
+
 	image=$1
 
 	if grep "^GRUB_TERMINAL_OUTPUT" $grub &> /dev/null

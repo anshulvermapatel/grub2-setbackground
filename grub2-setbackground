@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Copyright (C) 2017 Suraj Patil
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this Program/Script, to deal
+# in the Program/Script without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Program/Script, and to permit persons to whom the Program/Script is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Program/Script.
+
+if [[ "$EUID" -ne 0 ]]
+  then echo "Please run as root"	
+  exit
+fi
+
+
+
+grub=/etc/default/grub
+imagedestination=/boot/grub2/themes/system/
+theme=/boot/grub2/themes/system/theme.txt
+imagename=$(basename $1)
+
+if [[ ! -f $1 ]]
+	then echo "Enter proper path to the image"
+	exit
+fi
+
+if [ $# -eq 0 ]
+  then
+    echo "Please provide argument as an image"
+else
+	image=$1
+
+	if grep "^GRUB_TERMINAL_OUTPUT" $grub &> /dev/null
+		then
+			echo "----------------------------------------------------"
+			tee >(logger) <<< "Configuring Your Grub"
+			
+
+			#comment the GRUB_TERMINAL_OUTPUT line
+			sed -i '/^GRUB_TERMINAL_OUTPUT/ s/^/#/' $grub 
+	fi
+
+	#Check if GRUB_THEME entry exist and delete all of them
+	if grep 'GRUB_THEME' $grub &> /dev/null
+		then
+			sed -i '/GRUB_THEME/d' $grub
+	fi
+
+	#Insert GRUB_THEME line in grub file
+	sed -i '$ a GRUB_THEME=/boot/grub2/themes/system/theme.txt' $grub	
+
+	
+	#Extracting previous image name and deleting it 
+			echo "----------------------------------------------------"
+			tee >(logger) <<< "Deleting old image if any"
+			pimage=$(sed -n '/desktop-image/p' $theme | awk '{print $2}' | sed 's/"//g')
+			rm -f $imagedestination/$pimage
+
+			$(sed -i '/^desktop-image/ s/.*/desktop-image: "'"$imagename"'"/' $theme)
+			echo "----------------------------------------------------"
+			tee >(logger) <<< "Applying new background"
+			$(cp $1 $imagedestination)
+
+	#Check if system has bios or uefi
+	if [[ -d /sys/firmware/efi ]]
+		then
+			echo "----------------------------------------------------"
+			echo "Awesome!!! your system has UEFI"
+			echo "----------------------------------------------------"	
+			$(grub2-mkconfig -o /etc/grub2-efi.cfg)
+			echo "----------------------------------------------------"
+			tee >(logger) <<< "Done.. Reboot the system.. "
+
+	else
+		echo "----------------------------------------------------"
+		echo "Your system has BIOS"
+		$(grub2-mkconfig -o /etc/grub2.cfg)
+		echo "----------------------------------------------------"
+		tee >(logger) <<< "Done.. Reboot the system.. "
+	fi
+
+
+fi
+
